@@ -49,6 +49,20 @@ remove Snap GUI library variables before Gazebo starts:
 The mesh is visual only. Two primitive pontoons remain the collision and
 buoyancy geometry so an overly detailed STL cannot destabilize physics.
 
+The simulation configuration places the center of gravity and both thrust
+axes at `z=-0.16 m`. This removes the artificial pitch-up moment that occurred
+when thrust was applied below the configured center of mass. Treat this as a
+simulation baseline: update `physics_real.yaml` only from measured mass,
+center-of-gravity, and inertia data.
+
+The world uses a large low-roughness PBR ocean plane, atmospheric fog, and a
+visible sea floor. A collision-enabled shore begins roughly 35 m north of the
+spawn point, with a submerged shelf, sloped beach, elevated grassy land, and
+rocky outcrops. Physics remain independent of the visual water plane: Gazebo's
+graded-buoyancy system defines the free surface at `z=0`, and the native
+hydrodynamics system computes drag against the configured ocean-current
+vector. This follows VRX's separation of water visuals from vehicle forces.
+
 To use the older STL without colors:
 
 ```bash
@@ -70,8 +84,8 @@ and the `asv_bringup` launch package are retained.
 
 ## Important placeholders
 
-The current mass, inertia, pontoon dimensions, and model origin are starter
-values. Replace them with the fully loaded vessel values before evaluating
-controller performance. The calm-water world is intended only for model import
-and buoyancy bring-up. Hydrodynamic damping is intentionally deferred until
-the mass, draft, hull dimensions, and propulsion geometry are known.
+The current mass, inertia, pontoon dimensions, model origin, and hydrodynamic
+damping are starter values. Replace them with fully loaded vessel measurements
+before evaluating controller performance. Keep measured values in
+`config/physics_real.yaml`; the simulator defaults to `physics_sim.yaml` so
+simulation tuning does not silently overwrite the physical configuration.

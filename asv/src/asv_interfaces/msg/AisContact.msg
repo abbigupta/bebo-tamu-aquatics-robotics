@@ -1,0 +1,14 @@
+std_msgs/Header header
+uint32 mmsi
+string vessel_name
+bool position_valid
+float64 latitude_deg
+float64 longitude_deg
+float32 speed_over_ground_mps
+float32 course_over_ground_deg
+float32 heading_deg
+float32 distance_m
+float32 bearing_deg
+float32 relative_bearing_deg
+float32 closest_point_of_approach_m
+float32 time_to_closest_point_of_approach_s

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>asv_localization</name>
+  <version>0.1.0</version>
+  <description>Simulation localization and frame publication for the TLU ASV.</description>
+  <maintainer email="abbi@todo.todo">abbi</maintainer>
+  <license>Apache-2.0</license>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>rclpy</depend>
+  <depend>tf2_ros_py</depend>
+  <exec_depend>robot_localization</exec_depend>
+  <test_depend>python3-pytest</test_depend>
+  <export><build_type>ament_python</build_type></export>
+</package>

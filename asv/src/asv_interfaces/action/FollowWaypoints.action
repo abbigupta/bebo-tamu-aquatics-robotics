@@ -1,0 +1,12 @@
+# Map-frame waypoints visited in array order.
+geometry_msgs/PoseStamped[] waypoints
+float32 cruise_speed_mps
+float32 acceptance_radius_m
+---
+bool success
+uint32 completed_waypoints
+string message
+---
+uint32 current_waypoint
+float32 distance_remaining_m
+float32 heading_error_rad

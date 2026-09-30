@@ -18,7 +18,17 @@ fi
 
 workspace_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# This script owns the ROS underlay and workspace used by the simulator.
+unset COLCON_PREFIX_PATH AMENT_PREFIX_PATH
 source /opt/ros/lyrical/setup.bash
 source "${workspace_dir}/install/setup.bash"
+
+if ! ros2 pkg prefix robot_localization >/dev/null 2>&1; then
+  printf '%s\n' \
+    'robot_localization is not installed for ROS lyrical.' \
+    'Install it with: sudo apt install ros-lyrical-robot-localization' \
+    'Then rebuild or rerun this script.' >&2
+  exit 1
+fi
 
 exec ros2 launch asv_bringup sim.launch.py use_mesh:=true "$@"

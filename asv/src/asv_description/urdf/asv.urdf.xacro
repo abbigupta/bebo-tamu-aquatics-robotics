@@ -15,14 +15,31 @@
   <!-- Fusion model is Y-long; rotate it so its long axis follows ROS X. -->
   <xacro:arg name="mesh_yaw" default="1.57079632679"/>
 
-  <xacro:property name="mass" value="35.0"/>
-  <xacro:property name="pontoon_length" value="1.40"/>
-  <xacro:property name="pontoon_width" value="0.28"/>
-  <xacro:property name="pontoon_height" value="0.24"/>
-  <xacro:property name="pontoon_offset_y" value="0.48"/>
-  <xacro:property name="thruster_x" value="-0.38"/>
-  <xacro:property name="thruster_offset_y" value="0.29"/>
-  <xacro:property name="thruster_z" value="-0.22"/>
+  <xacro:arg name="mass" default="35.0"/>
+  <xacro:arg name="cog_z" default="-0.16"/>
+  <xacro:arg name="inertia_xx" default="5.0"/>
+  <xacro:arg name="inertia_yy" default="8.0"/>
+  <xacro:arg name="inertia_zz" default="12.0"/>
+  <xacro:arg name="pontoon_length" default="1.40"/>
+  <xacro:arg name="pontoon_width" default="0.28"/>
+  <xacro:arg name="pontoon_height" default="0.24"/>
+  <xacro:arg name="pontoon_offset_y" default="0.48"/>
+  <xacro:arg name="thruster_x" default="-0.38"/>
+  <xacro:arg name="thruster_offset_y" default="0.29"/>
+  <!-- Keep the thrust line through the CoG to avoid an artificial pitch-up. -->
+  <xacro:arg name="thruster_z" default="-0.16"/>
+  <xacro:arg name="current_x" default="0.2165"/>
+  <xacro:arg name="current_y" default="0.1250"/>
+  <xacro:arg name="current_z" default="0.0"/>
+
+  <xacro:property name="mass" value="$(arg mass)"/>
+  <xacro:property name="pontoon_length" value="$(arg pontoon_length)"/>
+  <xacro:property name="pontoon_width" value="$(arg pontoon_width)"/>
+  <xacro:property name="pontoon_height" value="$(arg pontoon_height)"/>
+  <xacro:property name="pontoon_offset_y" value="$(arg pontoon_offset_y)"/>
+  <xacro:property name="thruster_x" value="$(arg thruster_x)"/>
+  <xacro:property name="thruster_offset_y" value="$(arg thruster_offset_y)"/>
+  <xacro:property name="thruster_z" value="$(arg thruster_z)"/>
 
   <material name="hull_red">
     <color rgba="0.50 0.06 0.08 1.0"/>
@@ -44,11 +61,11 @@
 
   <link name="base_link">
     <inertial>
-      <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+      <origin xyz="0 0 $(arg cog_z)" rpy="0 0 0"/>
       <mass value="${mass}"/>
       <inertia
-        ixx="5.0" ixy="0.0" ixz="0.0"
-        iyy="8.0" iyz="0.0" izz="12.0"/>
+        ixx="$(arg inertia_xx)" ixy="0.0" ixz="0.0"
+        iyy="$(arg inertia_yy)" iyz="0.0" izz="$(arg inertia_zz)"/>
     </inertial>
 
     <!-- Stable primitive collision volumes; these also drive buoyancy. -->
@@ -110,14 +127,14 @@
         <material name="frame_gray"/>
       </visual>
       <visual name="port_thruster_visual">
-        <origin xyz="-0.45 ${pontoon_offset_y} -0.28" rpy="0 1.57079632679 0"/>
+        <origin xyz="${thruster_x} ${thruster_offset_y} ${thruster_z}" rpy="0 1.57079632679 0"/>
         <geometry>
           <cylinder radius="0.12" length="0.12"/>
         </geometry>
         <material name="thruster_dark"/>
       </visual>
       <visual name="starboard_thruster_visual">
-        <origin xyz="-0.45 -${pontoon_offset_y} -0.28" rpy="0 1.57079632679 0"/>
+        <origin xyz="${thruster_x} -${thruster_offset_y} ${thruster_z}" rpy="0 1.57079632679 0"/>
         <geometry>
           <cylinder radius="0.12" length="0.12"/>
         </geometry>
@@ -147,6 +164,13 @@
     <origin xyz="0.35 0 0.52" rpy="0 0 0"/>
   </joint>
 
+  <link name="sonar_link"/>
+  <joint name="sonar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="sonar_link"/>
+    <origin xyz="0.55 0 0.20" rpy="0 0 0"/>
+  </joint>
+
   <!-- Mass-light propeller links give Gazebo local X axes for thrust. -->
   <link name="port_thruster_link">
     <inertial>
@@ -159,7 +183,7 @@
     <parent link="base_link"/>
     <child link="port_thruster_link"/>
     <origin xyz="${thruster_x} ${thruster_offset_y} ${thruster_z}"
-            rpy="0 0 0"/>
+            rpy="0 0 3.14159265359"/>
     <axis xyz="1 0 0"/>
     <limit effort="100" velocity="500"/>
     <dynamics damping="0.01" friction="0.0"/>
@@ -176,7 +200,7 @@
     <parent link="base_link"/>
     <child link="starboard_thruster_link"/>
     <origin xyz="${thruster_x} -${thruster_offset_y} ${thruster_z}"
-            rpy="0 0 0"/>
+            rpy="0 0 3.14159265359"/>
     <axis xyz="1 0 0"/>
     <limit effort="100" velocity="500"/>
     <dynamics damping="0.01" friction="0.0"/>
@@ -187,7 +211,113 @@
     <mu2>0.05</mu2>
   </gazebo>
 
+  <gazebo reference="imu_link">
+    <sensor name="asv_imu" type="imu">
+      <topic>/asv/imu/data</topic>
+      <frame_id>imu_link</frame_id>
+      <update_rate>50</update_rate>
+      <always_on>true</always_on>
+      <imu>
+        <orientation_reference_frame>
+          <localization>ENU</localization>
+        </orientation_reference_frame>
+        <angular_velocity>
+          <x><noise type="gaussian"><stddev>0.0002</stddev></noise></x>
+          <y><noise type="gaussian"><stddev>0.0002</stddev></noise></y>
+          <z><noise type="gaussian"><stddev>0.0002</stddev></noise></z>
+        </angular_velocity>
+        <linear_acceleration>
+          <x><noise type="gaussian"><stddev>0.017</stddev></noise></x>
+          <y><noise type="gaussian"><stddev>0.017</stddev></noise></y>
+          <z><noise type="gaussian"><stddev>0.017</stddev></noise></z>
+        </linear_acceleration>
+      </imu>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="gps_link">
+    <sensor name="asv_gps" type="navsat">
+      <topic>/asv/gps/fix_raw</topic>
+      <frame_id>gps_link</frame_id>
+      <update_rate>10</update_rate>
+      <always_on>true</always_on>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="lidar_link">
+    <sensor name="asv_lidar" type="gpu_lidar">
+      <topic>/asv/lidar/scan</topic>
+      <frame_id>lidar_link</frame_id>
+      <update_rate>10</update_rate>
+      <always_on>true</always_on>
+      <visualize>true</visualize>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>720</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.14159265359</min_angle>
+            <max_angle>3.14159265359</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.15</min>
+          <max>30.0</max>
+          <resolution>0.01</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.01</stddev>
+        </noise>
+      </lidar>
+    </sensor>
+  </gazebo>
+
+  <!--
+    Gazebo Sim has no native acoustic sonar implementation. A narrow fan of
+    lidar rays supplies deterministic obstacle ranges, which are converted to
+    a ROS Range message with ULTRASOUND radiation_type by asv_sensors.
+  -->
+  <gazebo reference="sonar_link">
+    <sensor name="asv_front_sonar" type="gpu_lidar">
+      <topic>/asv/sonar/scan</topic>
+      <frame_id>sonar_link</frame_id>
+      <update_rate>15</update_rate>
+      <always_on>true</always_on>
+      <visualize>false</visualize>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>9</samples>
+            <resolution>1</resolution>
+            <min_angle>-0.2617993878</min_angle>
+            <max_angle>0.2617993878</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.20</min>
+          <max>12.0</max>
+          <resolution>0.01</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.02</stddev>
+        </noise>
+      </lidar>
+    </sensor>
+  </gazebo>
+
   <gazebo>
+    <plugin filename="gz-sim-odometry-publisher-system"
+            name="gz::sim::systems::OdometryPublisher">
+      <odom_topic>/model/asv/odometry</odom_topic>
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+      <odom_publish_frequency>30</odom_publish_frequency>
+      <dimensions>3</dimensions>
+    </plugin>
     <plugin filename="gz-sim-thruster-system"
             name="gz::sim::systems::Thruster">
       <namespace>asv</namespace>
@@ -196,8 +326,8 @@
       <fluid_density>1025</fluid_density>
       <propeller_diameter>0.10</propeller_diameter>
       <thrust_coefficient>0.10</thrust_coefficient>
-      <min_thrust_cmd>-15</min_thrust_cmd>
-      <max_thrust_cmd>25</max_thrust_cmd>
+      <min_thrust_cmd>-25</min_thrust_cmd>
+      <max_thrust_cmd>15</max_thrust_cmd>
       <deadband>0.05</deadband>
     </plugin>
     <plugin filename="gz-sim-thruster-system"
@@ -208,8 +338,8 @@
       <fluid_density>1025</fluid_density>
       <propeller_diameter>0.10</propeller_diameter>
       <thrust_coefficient>0.10</thrust_coefficient>
-      <min_thrust_cmd>-15</min_thrust_cmd>
-      <max_thrust_cmd>25</max_thrust_cmd>
+      <min_thrust_cmd>-25</min_thrust_cmd>
+      <max_thrust_cmd>15</max_thrust_cmd>
       <deadband>0.05</deadband>
     </plugin>
   </gazebo>
@@ -218,7 +348,14 @@
   <gazebo>
     <plugin filename="gz-sim-hydrodynamics-system"
             name="gz::sim::systems::Hydrodynamics">
+      <!-- Fixed-joint reduction merges base_link into this canonical link. -->
       <link_name>base_footprint</link_name>
+      <!--
+        Gazebo applies damping against this world-ENU water velocity. The
+        current simulator updates /model/asv/ocean_current at runtime.
+      -->
+      <namespace>asv</namespace>
+      <default_current>$(arg current_x) $(arg current_y) $(arg current_z)</default_current>
       <xU>-5.0</xU>
       <xUabsU>-8.0</xUabsU>
       <yV>-15.0</yV>
@@ -227,8 +364,8 @@
       <zWabsW>-40.0</zWabsW>
       <kP>-4.0</kP>
       <mQ>-8.0</mQ>
-      <nR>-5.0</nR>
-      <nRabsR>-8.0</nRabsR>
+      <nR>-15.0</nR>
+      <nRabsR>-20.0</nRabsR>
     </plugin>
   </gazebo>
 </robot>

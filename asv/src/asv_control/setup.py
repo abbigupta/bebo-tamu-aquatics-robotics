@@ -27,6 +27,11 @@ setup(
             'asv_control.twin_thruster_controller:main',
             'thruster_test = asv_control.thruster_test:main',
             'keyboard_teleop = asv_control.keyboard_teleop:main',
+            'cmd_vel_mux = asv_control.cmd_vel_mux:main',
+            'velocity_controller = asv_control.velocity_controller:main',
+            'ocean_current = asv_control.ocean_current:main',
+            'mavros_velocity_adapter = '
+            'asv_control.mavros_velocity_adapter:main',
         ],
     },
 )

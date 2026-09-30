@@ -7,9 +7,9 @@ import sys
 import termios
 import tty
 
+from geometry_msgs.msg import TwistStamped
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float64
 
 
 HELP = """
@@ -26,20 +26,20 @@ Twin-thruster keyboard control
 
 def command_for_key(
     key: str,
-    forward_thrust: float = 8.0,
-    reverse_thrust: float = 6.0,
-    turn_thrust: float = 6.0,
+    forward_speed: float = 0.8,
+    reverse_speed: float = 0.5,
+    turn_rate: float = 0.8,
 ) -> tuple[float, float] | None:
-    """Return port/starboard thrust for a supported key."""
+    """Return linear speed and yaw rate for a supported key."""
     commands = {
-        'w': (forward_thrust, forward_thrust),
-        '\x1b[A': (forward_thrust, forward_thrust),
-        's': (-reverse_thrust, -reverse_thrust),
-        '\x1b[B': (-reverse_thrust, -reverse_thrust),
-        'a': (-turn_thrust, turn_thrust),
-        '\x1b[D': (-turn_thrust, turn_thrust),
-        'd': (turn_thrust, -turn_thrust),
-        '\x1b[C': (turn_thrust, -turn_thrust),
+        'w': (forward_speed, 0.0),
+        '\x1b[A': (forward_speed, 0.0),
+        's': (-reverse_speed, 0.0),
+        '\x1b[B': (-reverse_speed, 0.0),
+        'a': (0.0, turn_rate),
+        '\x1b[D': (0.0, turn_rate),
+        'd': (0.0, -turn_rate),
+        '\x1b[C': (0.0, -turn_rate),
         ' ': (0.0, 0.0),
         'x': (0.0, 0.0),
     }
@@ -69,29 +69,26 @@ class KeyboardTeleop(Node):
 
     def __init__(self) -> None:
         super().__init__('keyboard_teleop')
-        self.declare_parameter('forward_thrust_n', 8.0)
-        self.declare_parameter('reverse_thrust_n', 6.0)
-        self.declare_parameter('turn_thrust_n', 6.0)
-        self.declare_parameter('publish_rate_hz', 10.0)
+        self.declare_parameter('forward_speed_mps', 0.8)
+        self.declare_parameter('reverse_speed_mps', 0.5)
+        self.declare_parameter('turn_rate_rad_s', 0.8)
+        self.declare_parameter('publish_rate_hz', 30.0)
 
-        self.forward_thrust = float(
-            self.get_parameter('forward_thrust_n').value
+        self.forward_speed = float(
+            self.get_parameter('forward_speed_mps').value
         )
-        self.reverse_thrust = float(
-            self.get_parameter('reverse_thrust_n').value
+        self.reverse_speed = float(
+            self.get_parameter('reverse_speed_mps').value
         )
-        self.turn_thrust = float(
-            self.get_parameter('turn_thrust_n').value
+        self.turn_rate = float(
+            self.get_parameter('turn_rate_rad_s').value
         )
         publish_rate = float(self.get_parameter('publish_rate_hz').value)
 
-        self.port_thrust = 0.0
-        self.starboard_thrust = 0.0
+        self.linear_speed = 0.0
+        self.yaw_rate = 0.0
         self.port_pub = self.create_publisher(
-            Float64, '/asv/thrusters/port/command', 10
-        )
-        self.starboard_pub = self.create_publisher(
-            Float64, '/asv/thrusters/starboard/command', 10
+            TwistStamped, '/asv/cmd_vel/teleop', 10
         )
         self.create_timer(1.0 / publish_rate, self.publish_command)
 
@@ -103,26 +100,26 @@ class KeyboardTeleop(Node):
 
         command = command_for_key(
             key,
-            self.forward_thrust,
-            self.reverse_thrust,
-            self.turn_thrust,
+            self.forward_speed,
+            self.reverse_speed,
+            self.turn_rate,
         )
         if command is not None:
-            self.port_thrust, self.starboard_thrust = command
+            self.linear_speed, self.yaw_rate = command
             self.publish_command()
         return False
 
     def publish_command(self) -> None:
-        port = Float64()
-        port.data = self.port_thrust
-        starboard = Float64()
-        starboard.data = self.starboard_thrust
-        self.port_pub.publish(port)
-        self.starboard_pub.publish(starboard)
+        message = TwistStamped()
+        message.header.stamp = self.get_clock().now().to_msg()
+        message.header.frame_id = 'base_link'
+        message.twist.linear.x = self.linear_speed
+        message.twist.angular.z = self.yaw_rate
+        self.port_pub.publish(message)
 
     def stop(self) -> None:
-        self.port_thrust = 0.0
-        self.starboard_thrust = 0.0
+        self.linear_speed = 0.0
+        self.yaw_rate = 0.0
         # Publish more than once so a final stop is unlikely to be dropped.
         self.publish_command()
         self.publish_command()
@@ -140,7 +137,7 @@ def main(args=None) -> None:
     try:
         tty.setraw(sys.stdin.fileno())
         while rclpy.ok():
-            rclpy.spin_once(node, timeout_sec=0.05)
+            rclpy.spin_once(node, timeout_sec=0.01)
             key = read_key()
             if key and node.set_from_key(key):
                 break

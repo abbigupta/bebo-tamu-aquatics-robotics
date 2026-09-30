@@ -1,0 +1,56 @@
+cd ~/ros_projects/asv
+./tools/run_sim.bash \
+  current_speed_mps:=0.0 \
+  current_speed_noise_stddev:=0.0
+
+
+
+cd ~/ros_projects/asv
+source /opt/ros/lyrical/setup.bash
+source install/setup.bash
+ros2 run asv_control keyboard_teleop
+
+OR 
+
+ros2 launch asv_bringup square_mission.launch.py
+
+
+GETTING LIVE DATA:
+cd ~/ros_projects/asv
+source /opt/ros/lyrical/setup.bash
+source install/setup.bash
+
+Confirm which sensor are publishing:
+ros2 topic list -t | grep /asv
+
+IMU:
+ros2 topic echo /asv/imu/data
+
+GPS:
+ros2 topic echo /asv/gps/fix
+
+Front Sonar Range:
+ros2 topic echo /asv/sonar/front
+
+
+Odometry:
+ros2 topic echo /asv/odometry/ground_truth
+
+
+
+For Lidar run rviz2 to visualize:
+
+rviz2
+
+In Rviz:
+ros2 topic hz /asv/imu/data
+ros2 topic hz /asv/gps/fix
+ros2 topic hz /asv/lidar/scan
+ros2 topic hz /asv/sonar/front
+
+rqt_plot
+
+/asv/imu/data/angular_velocity/z
+/asv/imu/data/linear_acceleration/x
+/asv/sonar/front/range
+/asv/odometry/ground_truth/twist/twist/linear/x

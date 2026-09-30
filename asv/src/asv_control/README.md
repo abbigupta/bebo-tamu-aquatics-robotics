@@ -10,7 +10,7 @@ Build the workspace once:
 
 ```bash
 cd ~/ros_projects/asv
-source /opt/ros/lyrical/setup.bash
+sourceros
 colcon build --symlink-install
 ```
 
@@ -37,8 +37,7 @@ With Gazebo running, start keyboard control in another terminal:
 
 ```bash
 cd ~/ros_projects/asv
-source /opt/ros/lyrical/setup.bash
-source install/setup.bash
+sourceros
 ros2 run asv_control keyboard_teleop
 ```
 
@@ -81,3 +80,28 @@ ros2 topic pub -r 10 /asv/thrusters/starboard/command \
 Positive thrust is forward. Opposite signs produce a pivot turn. Commands
 must be published continuously because the watchdog intentionally rejects
 stale commands.
+
+## Ocean current
+
+The simulation publishes a bounded Gauss-Markov current, following the model
+used by DAVE, to Gazebo's native hydrodynamics system. The vector is expressed
+in the world ENU frame and the default is 0.25 m/s at 30 degrees. Change it at
+launch time, for example:
+
+```bash
+./tools/run_sim.bash \
+  current_speed_mps:=0.45 \
+  current_direction_deg:=120.0 \
+  current_speed_noise_stddev:=0.025
+```
+
+Set `current_speed_noise_stddev:=0.0` for a constant current or
+`current_speed_mps:=0.0 current_speed_noise_stddev:=0.0` for still water.
+The live ROS topic is `/model/asv/ocean_current` (`geometry_msgs/msg/Vector3`).
+
+Keyboard commands now pass through a 50 Hz mux, velocity controller, and
+thruster safety loop. The previous 10--20 Hz pipeline could add about
+75--150 ms before Gazebo received thrust; the new path is typically under one
+50 Hz control cycle plus transport time. If response is still slow, check
+Gazebo's real-time factor: a value below 1.0 indicates compute/rendering load,
+not buoyancy latency.

@@ -1,0 +1,15 @@
+model:
+  mass: 35.0
+  # Battery / payload are low in the hulls. The thrust line passes through
+  # this height, avoiding the nonphysical nose-up moment seen previously.
+  cog_z: -0.16
+  inertia_xx: 5.0
+  inertia_yy: 12.0
+  inertia_zz: 12.0
+  pontoon_length: 1.40
+  pontoon_width: 0.28
+  pontoon_height: 0.24
+  pontoon_offset_y: 0.48
+  thruster_x: -0.38
+  thruster_offset_y: 0.29
+  thruster_z: -0.16

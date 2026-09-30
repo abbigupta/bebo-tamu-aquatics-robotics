@@ -1,9 +1,19 @@
 <?xml version="1.0"?>
 <sdf version="1.10">
   <world name="calm_water">
-    <physics name="1ms" type="dart">
-      <max_step_size>0.001</max_step_size>
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <world_frame_orientation>ENU</world_frame_orientation>
+      <latitude_deg>29.313499</latitude_deg>
+      <longitude_deg>-94.817141</longitude_deg>
+      <elevation>0.0</elevation>
+      <heading_deg>0.0</heading_deg>
+    </spherical_coordinates>
+    <physics name="marine_2ms" type="dart">
+      <!-- 500 Hz is ample for this vessel and leaves CPU headroom for input. -->
+      <max_step_size>0.002</max_step_size>
       <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>500</real_time_update_rate>
     </physics>
 
     <plugin filename="gz-sim-physics-system"
@@ -12,6 +22,14 @@
             name="gz::sim::systems::UserCommands"/>
     <plugin filename="gz-sim-scene-broadcaster-system"
             name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system"
+            name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-navsat-system"
+            name="gz::sim::systems::NavSat"/>
     <plugin filename="gz-sim-buoyancy-system"
             name="gz::sim::systems::Buoyancy">
       <graded_buoyancy>
@@ -25,37 +43,169 @@
     </plugin>
 
     <scene>
-      <ambient>0.45 0.45 0.45 1</ambient>
-      <background>0.65 0.80 0.92 1</background>
+      <ambient>0.34 0.39 0.43 1</ambient>
+      <background>0.48 0.68 0.84 1</background>
       <shadows>true</shadows>
-      <grid>true</grid>
+      <grid>false</grid>
+      <fog>
+        <type>linear</type>
+        <color>0.55 0.68 0.75 1</color>
+        <start>120</start>
+        <end>400</end>
+      </fog>
     </scene>
 
     <light type="directional" name="sun">
       <cast_shadows>true</cast_shadows>
       <pose>0 0 20 0 0 0</pose>
-      <diffuse>0.9 0.9 0.9 1</diffuse>
-      <specular>0.2 0.2 0.2 1</specular>
-      <direction>-0.4 0.2 -0.9</direction>
+      <diffuse>0.98 0.94 0.84 1</diffuse>
+      <specular>0.45 0.42 0.36 1</specular>
+      <direction>-0.45 0.18 -0.87</direction>
     </light>
 
-    <!-- Visual water surface only; buoyancy uses the z=0 density boundary. -->
+    <!--
+      Large PBR ocean plane inspired by VRX's separate visual / physical wave
+      treatment. Buoyancy and current physics remain at the z=0 surface.
+    -->
     <model name="water_visual">
       <static>true</static>
       <link name="water_link">
         <visual name="water">
-          <pose>0 0 -0.012 0 0 0</pose>
+          <pose>0 0 -0.004 0 0 0</pose>
           <geometry>
-            <box>
-              <size>200 200 0.02</size>
-            </box>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>1000 1000</size>
+            </plane>
           </geometry>
           <material>
-            <ambient>0.03 0.22 0.34 0.70</ambient>
-            <diffuse>0.04 0.32 0.48 0.70</diffuse>
-            <specular>0.55 0.55 0.55 0.70</specular>
+            <ambient>0.015 0.10 0.16 0.92</ambient>
+            <diffuse>0.025 0.24 0.34 0.92</diffuse>
+            <specular>0.82 0.88 0.90 1</specular>
+            <pbr>
+              <metal>
+                <roughness>0.12</roughness>
+                <metalness>0.0</metalness>
+              </metal>
+            </pbr>
           </material>
-          <transparency>0.30</transparency>
+          <transparency>0.12</transparency>
+        </visual>
+      </link>
+    </model>
+
+    <!-- A visible sea floor gives the transparent water depth and scale. -->
+    <model name="sea_floor">
+      <static>true</static>
+      <pose>0 0 -8.25 0 0 0</pose>
+      <link name="sea_floor_link">
+        <collision name="sea_floor_collision">
+          <geometry><box><size>1000 1000 0.5</size></box></geometry>
+        </collision>
+        <visual name="sea_floor_visual">
+          <geometry><box><size>1000 1000 0.5</size></box></geometry>
+          <material>
+            <ambient>0.16 0.14 0.09 1</ambient>
+            <diffuse>0.32 0.29 0.19 1</diffuse>
+            <specular>0.03 0.03 0.02 1</specular>
+            <pbr><metal><roughness>0.92</roughness><metalness>0</metalness></metal></pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!--
+      Collision-enabled shoreline on the north (+Y) side of the operating
+      area. The shelf rises gradually so the ASV can approach the beach while
+      the spawn point retains several metres of water beneath it.
+    -->
+    <model name="north_shore">
+      <static>true</static>
+      <link name="shore_link">
+        <collision name="submerged_shelf_collision">
+          <pose>0 5 -4.25 0.14 0 0</pose>
+          <geometry><box><size>220 55 0.8</size></box></geometry>
+        </collision>
+        <visual name="submerged_shelf_visual">
+          <pose>0 5 -4.25 0.14 0 0</pose>
+          <geometry><box><size>220 55 0.8</size></box></geometry>
+          <material>
+            <ambient>0.19 0.18 0.12 1</ambient>
+            <diffuse>0.38 0.35 0.23 1</diffuse>
+            <specular>0.02 0.02 0.01 1</specular>
+            <pbr><metal><roughness>0.95</roughness><metalness>0</metalness></metal></pbr>
+          </material>
+        </visual>
+
+        <collision name="beach_collision">
+          <pose>0 42 0 0.075 0 0</pose>
+          <geometry><box><size>220 30 0.7</size></box></geometry>
+        </collision>
+        <visual name="beach_visual">
+          <pose>0 42 0 0.075 0 0</pose>
+          <geometry><box><size>220 30 0.7</size></box></geometry>
+          <material>
+            <ambient>0.42 0.34 0.20 1</ambient>
+            <diffuse>0.76 0.66 0.43 1</diffuse>
+            <specular>0.06 0.05 0.03 1</specular>
+            <pbr><metal><roughness>0.88</roughness><metalness>0</metalness></metal></pbr>
+          </material>
+        </visual>
+
+        <collision name="land_collision">
+          <pose>0 90 -0.6 0 0 0</pose>
+          <geometry><box><size>220 70 4.0</size></box></geometry>
+        </collision>
+        <visual name="land_visual">
+          <pose>0 90 -0.6 0 0 0</pose>
+          <geometry><box><size>220 70 4.0</size></box></geometry>
+          <material>
+            <ambient>0.12 0.20 0.07 1</ambient>
+            <diffuse>0.25 0.42 0.14 1</diffuse>
+            <specular>0.02 0.02 0.01 1</specular>
+            <pbr><metal><roughness>0.98</roughness><metalness>0</metalness></metal></pbr>
+          </material>
+        </visual>
+
+        <!-- Irregular boulders break up the otherwise straight waterline. -->
+        <collision name="west_boulder_collision">
+          <pose>-18 35.5 0.0 0 0 0</pose>
+          <geometry><sphere><radius>1.4</radius></sphere></geometry>
+        </collision>
+        <visual name="west_boulder_visual">
+          <pose>-18 35.5 0.0 0 0 0</pose>
+          <geometry><sphere><radius>1.4</radius></sphere></geometry>
+          <material>
+            <ambient>0.16 0.15 0.13 1</ambient>
+            <diffuse>0.29 0.28 0.25 1</diffuse>
+            <pbr><metal><roughness>0.90</roughness><metalness>0</metalness></metal></pbr>
+          </material>
+        </visual>
+        <collision name="east_boulder_collision">
+          <pose>14 37 0.25 0 0 0</pose>
+          <geometry><sphere><radius>1.8</radius></sphere></geometry>
+        </collision>
+        <visual name="east_boulder_visual">
+          <pose>14 37 0.25 0 0 0</pose>
+          <geometry><sphere><radius>1.8</radius></sphere></geometry>
+          <material>
+            <ambient>0.14 0.14 0.13 1</ambient>
+            <diffuse>0.27 0.27 0.25 1</diffuse>
+            <pbr><metal><roughness>0.92</roughness><metalness>0</metalness></metal></pbr>
+          </material>
+        </visual>
+        <collision name="small_boulder_collision">
+          <pose>7 34.5 -0.25 0 0 0</pose>
+          <geometry><sphere><radius>0.9</radius></sphere></geometry>
+        </collision>
+        <visual name="small_boulder_visual">
+          <pose>7 34.5 -0.25 0 0 0</pose>
+          <geometry><sphere><radius>0.9</radius></sphere></geometry>
+          <material>
+            <ambient>0.15 0.14 0.12 1</ambient>
+            <diffuse>0.30 0.28 0.24 1</diffuse>
+            <pbr><metal><roughness>0.94</roughness><metalness>0</metalness></metal></pbr>
+          </material>
         </visual>
       </link>
     </model>
