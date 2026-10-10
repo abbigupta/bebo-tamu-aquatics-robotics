@@ -1,0 +1,15 @@
+# ROS 2 / colcon output
+build/
+install/
+log/
+
+# Python output
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Local development files
+.venv/
+.vscode/
+*.swp
